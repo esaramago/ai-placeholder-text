@@ -1,7 +1,7 @@
 {
-  "name": "context-aware-text-assistant",
+  "name": "openrouter-text-assistant",
   "version": "1.0.0",
-  "description": "Context-Aware Text Assistant for Figma via OpenRouter (BYOK)",
+  "description": "Context-aware placeholder text assistant for Figma via OpenRouter (BYOK)",
   "private": true,
   "scripts": {
     "build": "node build.mjs",

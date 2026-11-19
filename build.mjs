@@ -10,26 +10,37 @@ const DIST_DIR = path.resolve('dist');
 const DIST_TEST_DIR = path.resolve('dist-test');
 
 async function buildUiHtml() {
-  const result = await esbuild.build({
-    entryPoints: ['src/ui.ts'],
-    bundle: true,
-    write: false,
-    minify: !isWatch,
-    target: 'es2020',
-    format: 'iife',
-  });
+  const [jsResult, cssResult] = await Promise.all([
+    esbuild.build({
+      entryPoints: ['src/ui.ts'],
+      bundle: true,
+      write: false,
+      minify: !isWatch,
+      target: 'es2020',
+      format: 'iife',
+    }),
+    esbuild.build({
+      entryPoints: ['src/ui.css'],
+      bundle: true,
+      write: false,
+      minify: !isWatch,
+    }),
+  ]);
 
-  const bundledJs = result.outputFiles[0].text;
+  const bundledJs = jsResult.outputFiles[0].text;
+  const bundledCss = cssResult.outputFiles[0].text;
   const htmlTemplate = fs.readFileSync(path.resolve('src/ui.html'), 'utf8');
 
+  if (!htmlTemplate.includes('<!-- INLINE_STYLE -->')) {
+    throw new Error('src/ui.html must contain <!-- INLINE_STYLE --> placeholder');
+  }
   if (!htmlTemplate.includes('<!-- INLINE_SCRIPT -->')) {
     throw new Error('src/ui.html must contain <!-- INLINE_SCRIPT --> placeholder');
   }
 
-  const finalHtml = htmlTemplate.replace(
-    '<!-- INLINE_SCRIPT -->',
-    `<script>\n${bundledJs}\n</script>`,
-  );
+  const finalHtml = htmlTemplate
+    .replace('<!-- INLINE_STYLE -->', () => `<style>\n${bundledCss}\n</style>`)
+    .replace('<!-- INLINE_SCRIPT -->', () => `<script>\n${bundledJs}\n</script>`);
 
   fs.mkdirSync(DIST_DIR, { recursive: true });
   fs.writeFileSync(path.join(DIST_DIR, 'ui.html'), finalHtml, 'utf8');

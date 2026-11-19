@@ -250,7 +250,7 @@ dom.promptInput.addEventListener('input', () => {
 });
 
 dom.promptInput.addEventListener('keydown', (e: KeyboardEvent) => {
-  if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
+  if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) {
     e.preventDefault();
     handleApply();
   }
@@ -300,6 +300,7 @@ dom.modelInput.addEventListener('blur', () => {
 
 // Messages from Figma Sandbox
 window.onmessage = async (event: MessageEvent<{ pluginMessage?: PluginToUiMessage }>) => {
+  if (event.source !== window.parent) return;
   const msg = event.data?.pluginMessage;
   if (!msg) return;
 

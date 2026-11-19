@@ -1,10 +1,10 @@
-import type { ContextPayload, TextUpdate } from './types';
+import type { ContextPayload, TextUpdate } from './types'
 
-const OPENROUTER_URL = 'https://openrouter.ai/api/v1/chat/completions';
+const OPENROUTER_URL = 'https://openrouter.ai/api/v1/chat/completions'
 
 export interface ChatMessage {
-  role: 'system' | 'user';
-  content: string;
+  role: 'system' | 'user'
+  content: string
 }
 
 export function buildPromptMessages(
@@ -21,7 +21,7 @@ export function buildPromptMessages(
     '3. Include an entry for every target ID in <targets> and do NOT include any other node IDs.',
     '4. Preserve intentional line breaks or concise UI constraints (e.g., button labels should stay button-sized).',
     '5. Do not wrap the response in explanations; output valid JSON only.',
-  ].join('\n');
+  ].join('\n')
 
   const targetsJson = JSON.stringify(
     payload.targets.map((t) => ({
@@ -32,7 +32,7 @@ export function buildPromptMessages(
     })),
     null,
     2,
-  );
+  )
 
   const userPrompt = [
     `Instruction: ${userInstruction.trim()}`,
@@ -44,93 +44,104 @@ export function buildPromptMessages(
     '<targets>',
     targetsJson,
     '</targets>',
-  ].join('\n');
+  ].join('\n')
 
   return [
     { role: 'system', content: systemPrompt },
     { role: 'user', content: userPrompt },
-  ];
+  ]
 }
 
 function stripMarkdownFences(raw: string): string {
-  const trimmed = raw.trim();
-  const fenceMatch = trimmed.match(/^```(?:json)?\s*\n?([\s\S]*?)\n?```$/i);
+  const trimmed = raw.trim()
+  const fenceMatch = trimmed.match(/^```(?:json)?\s*\n?([\s\S]*?)\n?```$/i)
   if (fenceMatch) {
-    return fenceMatch[1].trim();
+    return fenceMatch[1].trim()
   }
-  return trimmed;
+  return trimmed
 }
 
 export function parseOpenRouterResponse(
   rawContent: string,
   allowedIds: ReadonlySet<string>,
 ): TextUpdate[] {
-  const cleaned = stripMarkdownFences(rawContent);
+  const cleaned = stripMarkdownFences(rawContent)
 
-  let parsed: unknown;
+  let parsed: unknown
   try {
-    parsed = JSON.parse(cleaned);
+    parsed = JSON.parse(cleaned)
   } catch {
     // Fallback: try extracting the first JSON object or array
-    const objMatch = cleaned.match(/(\{[\s\S]*\}|\[[\s\S]*\])/);
+    const objMatch = cleaned.match(/(\{[\s\S]*\}|\[[\s\S]*\])/)
     if (!objMatch) {
-      throw new Error('The AI model did not return valid JSON. Try again or switch models.');
+      throw new Error(
+        'The AI model did not return valid JSON. Try again or switch models.',
+      )
     }
     try {
-      parsed = JSON.parse(objMatch[1]);
+      parsed = JSON.parse(objMatch[1])
     } catch {
-      throw new Error('The AI model returned malformed JSON. Try again or switch models.');
+      throw new Error(
+        'The AI model returned malformed JSON. Try again or switch models.',
+      )
     }
   }
 
-  let items: unknown[];
+  let items: unknown[]
   if (Array.isArray(parsed)) {
-    items = parsed;
+    items = parsed
   } else if (
     parsed &&
     typeof parsed === 'object' &&
     'updates' in parsed &&
     Array.isArray((parsed as { updates: unknown }).updates)
   ) {
-    items = (parsed as { updates: unknown[] }).updates;
+    items = (parsed as { updates: unknown[] }).updates
   } else {
-    throw new Error('Unexpected response format from AI model (missing "updates" array).');
+    throw new Error(
+      'Unexpected response format from AI model (missing "updates" array).',
+    )
   }
 
-  const updates: TextUpdate[] = [];
-  const seenIds = new Set<string>();
+  const updates: TextUpdate[] = []
+  const seenIds = new Set<string>()
 
   for (const item of items) {
-    if (!item || typeof item !== 'object') continue;
-    const record = item as Record<string, unknown>;
-    if (typeof record.id !== 'string' || typeof record.text !== 'string') continue;
-    if (!allowedIds.has(record.id) || seenIds.has(record.id)) continue;
+    if (!item || typeof item !== 'object') continue
+    const record = item as Record<string, unknown>
+    if (typeof record.id !== 'string' || typeof record.text !== 'string')
+      continue
+    if (!allowedIds.has(record.id) || seenIds.has(record.id)) continue
 
-    seenIds.add(record.id);
-    updates.push({ id: record.id, text: record.text });
+    seenIds.add(record.id)
+    updates.push({ id: record.id, text: record.text })
   }
 
   if (updates.length === 0) {
-    throw new Error('No valid target updates were returned by the AI model.');
+    throw new Error('No valid target updates were returned by the AI model.')
   }
 
-  return updates;
+  return updates
 }
 
 export async function generateCopyUpdates(params: {
-  apiKey: string;
-  model: string;
-  instruction: string;
-  payload: ContextPayload;
+  apiKey: string
+  model: string
+  instruction: string
+  payload: ContextPayload
 }): Promise<TextUpdate[]> {
-  const { apiKey, model, instruction, payload } = params;
-  const messages = buildPromptMessages(instruction, payload);
-  const allowedIds = new Set(payload.targets.map((t) => t.id));
+  const { apiKey, model, instruction, payload } = params
+  const messages = buildPromptMessages(instruction, payload)
+  const allowedIds = new Set(payload.targets.map((t) => t.id))
 
-  let response: Response;
+  const controller = new AbortController()
+  const timeoutId = setTimeout(() => controller.abort(), 45_000)
+
+  let response: Response
   try {
     response = await fetch(OPENROUTER_URL, {
       method: 'POST',
+      signal: controller.signal,
       headers: {
         Authorization: `Bearer ${apiKey.trim()}`,
         'Content-Type': 'application/json',
@@ -141,51 +152,71 @@ export async function generateCopyUpdates(params: {
         messages,
         temperature: 0.4,
       }),
-    });
-  } catch {
-    throw new Error('Network error reaching OpenRouter. Check your internet connection.');
+    })
+  } catch (err) {
+    if (err instanceof Error && err.name === 'AbortError') {
+      throw new Error(
+        'OpenRouter request timed out. Try again or use a faster model.',
+      )
+    }
+    throw new Error(
+      'Network error reaching OpenRouter. Check your internet connection.',
+    )
+  } finally {
+    clearTimeout(timeoutId)
   }
 
   if (!response.ok) {
-    let apiMessage = '';
+    let apiMessage = ''
     try {
-      const errJson = (await response.json()) as { error?: { message?: string } };
-      apiMessage = errJson?.error?.message ?? '';
+      const errJson = (await response.json()) as {
+        error?: { message?: string }
+      }
+      apiMessage = errJson?.error?.message ?? ''
     } catch {
       // Ignore parse errors on error body
     }
 
     if (response.status === 401) {
-      throw new Error('Invalid OpenRouter API key. Check your key in Settings.');
+      throw new Error('Invalid OpenRouter API key. Check your key in Settings.')
     }
     if (response.status === 402) {
-      throw new Error('Insufficient OpenRouter credits for this request.');
+      throw new Error('Insufficient OpenRouter credits for this request.')
     }
     if (response.status === 400 || response.status === 404) {
       throw new Error(
         apiMessage
           ? `Model error (${response.status}): ${apiMessage}`
           : `Model "${model}" was rejected or not found on OpenRouter.`,
-      );
+      )
     }
     if (response.status === 429) {
-      throw new Error('Rate limit exceeded on OpenRouter. Wait a moment and try again.');
+      throw new Error(
+        'Rate limit exceeded on OpenRouter. Wait a moment and try again.',
+      )
     }
     throw new Error(
       apiMessage
         ? `OpenRouter error (${response.status}): ${apiMessage}`
         : `OpenRouter request failed with status ${response.status}.`,
-    );
+    )
   }
 
-  const data = (await response.json()) as {
-    choices?: Array<{ message?: { content?: string | null } }>;
-  };
+  let data: {
+    choices?: Array<{ message?: { content?: string | null } }>
+  }
+  try {
+    data = (await response.json()) as {
+      choices?: Array<{ message?: { content?: string | null } }>
+    }
+  } catch {
+    throw new Error('OpenRouter returned an invalid JSON response.')
+  }
 
-  const content = data.choices?.[0]?.message?.content;
+  const content = data.choices?.[0]?.message?.content
   if (typeof content !== 'string' || !content.trim()) {
-    throw new Error('OpenRouter returned an empty response.');
+    throw new Error('OpenRouter returned an empty response.')
   }
 
-  return parseOpenRouterResponse(content, allowedIds);
+  return parseOpenRouterResponse(content, allowedIds)
 }

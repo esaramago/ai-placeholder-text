@@ -1,6 +1,6 @@
 {
-  "name": "Context-Aware Text Assistant",
-  "id": "context-aware-text-assistant",
+  "name": "OpenRouter text assistant",
+  "id": "openrouter-text-assistant",
   "api": "1.0.0",
   "main": "dist/code.js",
   "ui": "dist/ui.html",

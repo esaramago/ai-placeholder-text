@@ -1,58 +1,62 @@
-import type { TextUpdate } from './types';
+import type { TextUpdate } from './types'
 
 function deduplicateFonts(fonts: readonly FontName[]): FontName[] {
-  const seen = new Set<string>();
-  const unique: FontName[] = [];
+  const seen = new Set<string>()
+  const unique: FontName[] = []
   for (const font of fonts) {
-    const key = `${font.family}::${font.style}`;
+    const key = `${font.family}::${font.style}`
     if (!seen.has(key)) {
-      seen.add(key);
-      unique.push(font);
+      seen.add(key)
+      unique.push(font)
     }
   }
-  return unique;
+  return unique
 }
 
 export async function loadFontsForTextNode(node: TextNode): Promise<void> {
   if (node.hasMissingFont) {
-    throw new Error(`Missing font on layer "${node.name}". Please resolve missing fonts in Figma first.`);
+    throw new Error(
+      `Missing font on layer "${node.name}". Please resolve missing fonts in Figma first.`,
+    )
   }
 
-  let fonts: FontName[];
+  let fonts: FontName[]
   if (node.fontName === figma.mixed) {
     if (node.characters.length === 0) {
-      fonts = [];
+      fonts = []
     } else {
-      fonts = deduplicateFonts(node.getRangeAllFontNames(0, node.characters.length));
+      fonts = deduplicateFonts(
+        node.getRangeAllFontNames(0, node.characters.length),
+      )
     }
   } else {
-    fonts = [node.fontName];
+    fonts = [node.fontName]
   }
 
-  await Promise.all(fonts.map((font) => figma.loadFontAsync(font)));
+  await Promise.all(fonts.map((font) => figma.loadFontAsync(font)))
 }
 
 export async function applyTextUpdates(
   updates: readonly TextUpdate[],
   allowedTargetIds: ReadonlySet<string>,
 ): Promise<number> {
-  let updatedCount = 0;
+  let updatedCount = 0
 
   for (const update of updates) {
     // Security: strictly enforce that only selected target IDs can be modified
     if (!allowedTargetIds.has(update.id)) {
-      continue;
+      continue
     }
 
-    const node = await figma.getNodeByIdAsync(update.id);
+    const node = await figma.getNodeByIdAsync(update.id)
     if (!node || node.type !== 'TEXT') {
-      continue;
+      continue
     }
 
-    await loadFontsForTextNode(node);
-    node.characters = update.text;
-    updatedCount += 1;
+    await loadFontsForTextNode(node)
+    node.characters = update.text
+    updatedCount += 1
   }
 
-  return updatedCount;
+  return updatedCount
 }
