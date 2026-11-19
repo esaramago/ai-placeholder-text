@@ -300,9 +300,8 @@ dom.modelInput.addEventListener('blur', () => {
 
 // Messages from Figma Sandbox
 window.onmessage = async (event: MessageEvent<{ pluginMessage?: PluginToUiMessage }>) => {
-  if (event.source !== window.parent) return;
   const msg = event.data?.pluginMessage;
-  if (!msg) return;
+  if (!msg || typeof msg !== 'object') return;
 
   switch (msg.type) {
     case 'settings-loaded': {

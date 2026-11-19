@@ -1,6 +1,6 @@
 {
   "name": "OpenRouter text assistant",
-  "id": "openrouter-text-assistant",
+  "id": "1705385758543067897",
   "api": "1.0.0",
   "main": "dist/code.js",
   "ui": "dist/ui.html",
