@@ -1,0 +1,21 @@
+{
+  "name": "context-aware-text-assistant",
+  "version": "1.0.0",
+  "description": "Context-Aware Text Assistant for Figma via OpenRouter (BYOK)",
+  "private": true,
+  "scripts": {
+    "build": "node build.mjs",
+    "watch": "node build.mjs --watch",
+    "typecheck": "tsc --noEmit",
+    "test": "node build.mjs --test && node dist-test/tests.cjs"
+  },
+  "devDependencies": {
+    "@figma/plugin-typings": "^1.100.0",
+    "@types/node": "^26.6.6",
+    "esbuild": "^0.24.2",
+    "typescript": "^5.7.2"
+  },
+  "allowBuilds": {
+    "esbuild": true
+  }
+}
